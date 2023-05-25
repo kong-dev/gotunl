@@ -27,7 +27,7 @@ type profile struct {
 }
 type Gotunl struct {
 	authKey    string
-	profPath   string
+	profPath   []string
 	service    string
 	unixSocket string
 	Profiles   map[string]profile
@@ -50,24 +50,30 @@ func _getKey() string {
 	return ""
 }
 
-func _getProfilePath() string {
+func _getProfilePath() []string {
 	home := ""
-	profPath := ""
+	profPath := []string{}
+
+	appendIfExist := func(list []string, path string) []string {
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			return list
+		}
+		return append(list, path)
+	}
+
 	switch oS := runtime.GOOS; oS {
 	case "darwin":
 		home = os.Getenv("HOME")
-		profPath = home + "/Library/Application Support/pritunl/profiles"
+		profPath = appendIfExist(profPath, home+"/Library/Application Support/pritunl/profiles")
+		profPath = appendIfExist(profPath, "/var/lib/pritunl-client/profiles")
 	case "windows":
 		home = os.Getenv("APPDATA")
-		profPath = home + "\\pritunl\\profiles"
+		profPath = appendIfExist(profPath, home+"\\pritunl\\profiles")
 	case "linux":
 		home = os.Getenv("HOME")
-		profPath = home + "/.config/pritunl/profiles"
+		profPath = appendIfExist(profPath, home+"/.config/pritunl/profiles")
 	}
-	if _, err := os.Stat(profPath); !os.IsNotExist(err) {
-		return profPath
-	}
-	return ""
+	return profPath
 }
 
 func New() *Gotunl {
@@ -136,7 +142,11 @@ func (g Gotunl) StopConnections() {
 }
 
 func (g Gotunl) loadProfiles() {
-	res, _ := filepath.Glob(g.profPath + "/*.conf")
+	res := []string{}
+	for _, p := range g.profPath {
+		matched, _ := filepath.Glob(p + "/*.conf")
+		res = append(res, matched...)
+	}
 	for i, f := range res {
 		c := i + 1
 		prof := strings.Split(filepath.Base(f), ".")[0]
