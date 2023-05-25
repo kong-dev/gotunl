@@ -1,4 +1,4 @@
-module github.com/cghdev/gotunl
+module github.com/kong-dev/gotunl
 
 go 1.18
 
